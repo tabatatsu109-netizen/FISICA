@@ -19,12 +19,22 @@
 
 ## セットアップ
 
+PostgreSQLの接続文字列を `.env` の `DATABASE_URL` に設定してから:
+
 ```bash
 npm install
-npx prisma db push        # SQLite DB作成
+npx prisma db push        # スキーマをDBに反映
 node prisma/seed.mjs      # デモデータ投入(任意)
 npm run dev               # http://localhost:3000
 ```
+
+## デプロイ(Vercel + Neon)
+
+1. [Neon](https://neon.tech) で無料DBを作成し、接続文字列(`postgresql://...`)を取得
+2. ローカルの `.env` に設定して `npx prisma db push`(+必要なら `node prisma/seed.mjs`)
+3. [Vercel](https://vercel.com) で本リポジトリをImportし、環境変数を設定してDeploy:
+   - `DATABASE_URL` = Neonの接続文字列
+   - `SESSION_SECRET` = 強いランダム値(`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` で生成)
 
 ### デモアカウント(シード後)
 | ロール | ID | パスワード |
@@ -34,14 +44,13 @@ npm run dev               # http://localhost:3000
 
 ## 技術構成
 - **Next.js 16 (App Router / Webpack) + TypeScript + Tailwind CSS v4**
-- **Prisma 6 + SQLite**(本番はPostgreSQLへ差し替え可能: `prisma/schema.prisma` のdatasourceと`DATABASE_URL`を変更)
+- **Prisma 6 + PostgreSQL**(Neon等のマネージドPostgres推奨)
 - **Recharts**(グラフ)/ HMAC署名Cookieによるセッション認証(bcryptパスワードハッシュ)
 
 > 注: このリポジトリはexFATドライブでの開発を考慮し、dev/buildともに `--webpack` を使用しています(Turbopackはシンボリックリンク必須のためexFAT非対応)。NTFS環境ならpackage.jsonから`--webpack`を外してTurbopackも利用可能です。
 
 ## 本番運用前のTODO
 - `SESSION_SECRET` 環境変数を必ず強いランダム値に変更
-- DBをPostgreSQL等へ移行(Vercel + Neon / Supabase など)
 - 選手アカウントの管理画面(現状はシードスクリプトで作成)
 - 未成年の身体データを扱うため、保護者同意・プライバシーポリシーの整備
 
