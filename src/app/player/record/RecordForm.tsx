@@ -165,8 +165,17 @@ export function RecordForm({ defaults }: { defaults: Defaults }) {
   );
 }
 
-function MealInput({ mealKey, defaults }: { mealKey: (typeof MEAL_KEYS)[number]; defaults: { ate: boolean; tags: string[] } }) {
+const RICE_PRESETS = [150, 200, 250, 300];
+
+function MealInput({
+  mealKey,
+  defaults,
+}: {
+  mealKey: (typeof MEAL_KEYS)[number];
+  defaults: { ate: boolean; tags: string[]; menu: string; riceGrams: number | null };
+}) {
   const [ate, setAte] = useState(defaults.ate);
+  const [rice, setRice] = useState<number | "">(defaults.riceGrams ?? "");
   const isSnack = mealKey === "snack";
   return (
     <div>
@@ -183,16 +192,56 @@ function MealInput({ mealKey, defaults }: { mealKey: (typeof MEAL_KEYS)[number];
           食べた
         </label>
       </div>
-      {ate && !isSnack && (
-        <div className="flex flex-wrap gap-2">
-          {MEAL_TAGS.map((tag) => (
-            <label key={tag} className="cursor-pointer">
-              <input type="checkbox" name={`meal_${mealKey}_tags`} value={tag} defaultChecked={defaults.tags.includes(tag)} className="peer sr-only" />
-              <span className="inline-block rounded-full border border-white/10 bg-surface-2 px-3 py-1.5 text-xs peer-checked:bg-accent/20 peer-checked:border-accent peer-checked:text-accent">
-                {tag}
-              </span>
-            </label>
-          ))}
+      {ate && (
+        <div className="flex flex-col gap-2.5">
+          <input
+            type="text"
+            name={`meal_${mealKey}_menu`}
+            defaultValue={defaults.menu}
+            placeholder={isSnack ? "例: おにぎり、プロテイン" : "メニュー(例: カレーライス、サラダ、牛乳)"}
+            className="bg-surface-2 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-accent"
+          />
+          {!isSnack && (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {MEAL_TAGS.map((tag) => (
+                  <label key={tag} className="cursor-pointer">
+                    <input type="checkbox" name={`meal_${mealKey}_tags`} value={tag} defaultChecked={defaults.tags.includes(tag)} className="peer sr-only" />
+                    <span className="inline-block rounded-full border border-white/10 bg-surface-2 px-3 py-1.5 text-xs peer-checked:bg-accent/20 peer-checked:border-accent peer-checked:text-accent">
+                      {tag}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-ink-3">ご飯の量</span>
+                {RICE_PRESETS.map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setRice(rice === g ? "" : g)}
+                    className={`rounded-full border px-3 py-1.5 text-xs tabular ${
+                      rice === g ? "bg-accent/20 border-accent text-accent" : "bg-surface-2 border-white/10 text-ink-2"
+                    }`}
+                  >
+                    {g}g
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  name={`meal_${mealKey}_rice`}
+                  value={rice}
+                  min={0}
+                  max={1000}
+                  step={10}
+                  inputMode="numeric"
+                  onChange={(e) => setRice(e.target.value === "" ? "" : Number(e.target.value))}
+                  placeholder="g"
+                  className="w-20 bg-surface-2 border border-white/10 rounded-lg px-2.5 py-1.5 text-xs tabular outline-none focus:border-accent"
+                />
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

@@ -21,10 +21,10 @@ export async function saveRecord(formData: FormData) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error("invalid date");
 
   const meals: Meals = {
-    breakfast: { ate: false, tags: [] },
-    lunch: { ate: false, tags: [] },
-    dinner: { ate: false, tags: [] },
-    snack: { ate: false, tags: [] },
+    breakfast: { ate: false, tags: [], menu: "", riceGrams: null },
+    lunch: { ate: false, tags: [], menu: "", riceGrams: null },
+    dinner: { ate: false, tags: [], menu: "", riceGrams: null },
+    snack: { ate: false, tags: [], menu: "", riceGrams: null },
   };
   for (const key of MEAL_KEYS) {
     const ate = formData.get(`meal_${key}_ate`) === "on";
@@ -32,7 +32,9 @@ export async function saveRecord(formData: FormData) {
       .getAll(`meal_${key}_tags`)
       .map(String)
       .filter((t): t is MealTag => (MEAL_TAGS as readonly string[]).includes(t));
-    meals[key] = { ate: ate || tags.length > 0, tags };
+    const menu = String(formData.get(`meal_${key}_menu`) ?? "").slice(0, 200);
+    const riceGrams = numOrNull(formData.get(`meal_${key}_rice`), 0, 1000);
+    meals[key] = { ate: ate || tags.length > 0 || menu.length > 0, tags, menu, riceGrams };
   }
 
   const data = {

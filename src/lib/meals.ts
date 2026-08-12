@@ -13,22 +13,31 @@ export const MEAL_LABELS: Record<MealKey, string> = {
 export const MEAL_TAGS = ["主食", "主菜", "副菜", "乳製品", "果物"] as const;
 export type MealTag = (typeof MEAL_TAGS)[number];
 
-export type MealEntry = { ate: boolean; tags: MealTag[] };
+export type MealEntry = {
+  ate: boolean;
+  tags: MealTag[];
+  menu: string; // 食べたメニューの自由記述(例: カレーライス、サラダ)
+  riceGrams: number | null; // ご飯の量(g)。補食は使わない想定
+};
 export type Meals = Record<MealKey, MealEntry>;
+
+function emptyEntry(): MealEntry {
+  return { ate: false, tags: [], menu: "", riceGrams: null };
+}
 
 export function emptyMeals(): Meals {
   return {
-    breakfast: { ate: false, tags: [] },
-    lunch: { ate: false, tags: [] },
-    dinner: { ate: false, tags: [] },
-    snack: { ate: false, tags: [] },
+    breakfast: emptyEntry(),
+    lunch: emptyEntry(),
+    dinner: emptyEntry(),
+    snack: emptyEntry(),
   };
 }
 
 export function parseMeals(json: string | null | undefined): Meals {
   if (!json) return emptyMeals();
   try {
-    const parsed = JSON.parse(json) as Partial<Meals>;
+    const parsed = JSON.parse(json) as Partial<Record<MealKey, Partial<MealEntry>>>;
     const base = emptyMeals();
     for (const key of MEAL_KEYS) {
       const entry = parsed[key];
@@ -36,6 +45,8 @@ export function parseMeals(json: string | null | undefined): Meals {
         base[key] = {
           ate: entry.ate,
           tags: Array.isArray(entry.tags) ? entry.tags.filter((t): t is MealTag => (MEAL_TAGS as readonly string[]).includes(t)) : [],
+          menu: typeof entry.menu === "string" ? entry.menu.slice(0, 200) : "",
+          riceGrams: typeof entry.riceGrams === "number" && Number.isFinite(entry.riceGrams) ? entry.riceGrams : null,
         };
       }
     }
