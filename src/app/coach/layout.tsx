@@ -18,6 +18,9 @@ export default async function CoachLayout({ children }: LayoutProps<"/coach">) {
           <span className="text-xs font-medium text-ink-3 ml-2">COACH</span>
         </Link>
         <div className="flex items-center gap-3">
+          <Link href="/coach/players" className="text-xs text-ink-2 border border-white/10 rounded-full px-3 py-1.5 hover:border-accent/50">
+            選手を追加
+          </Link>
           <span className="text-sm text-ink-2">{coach?.name}</span>
           <form action={logout}>
             <button className="text-xs text-ink-3 border border-white/10 rounded-full px-3 py-1.5">ログアウト</button>
