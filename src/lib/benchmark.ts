@@ -3,6 +3,7 @@
 // 一般の肥満指数とは意味合いが異なる「サッカー選手としての目標値」。
 
 export type Position = "GK" | "DF" | "MF" | "FW";
+export type DetailedPosition = "GK" | "CB" | "SB" | "CH" | "SH" | "FW";
 export type Sex = "MALE" | "FEMALE";
 
 // U13..U20 のインデックス 0..7
@@ -68,4 +69,28 @@ export function compareToJleague(
     bmiDiff: playerBmi - avgBmi,
     percentile: Math.round(Math.min(Math.max((heightCm / avg.height) * 100, 0), 100)),
   };
+}
+
+/** Jリーグ詳細ポジション別平均値 */
+export const J1_DETAILED_AVERAGE: Record<DetailedPosition, { height: number; weight: number; topSpeed: number | null; vo2max: number | null; description: string }> = {
+  GK: { height: 188, weight: 84, topSpeed: null, vo2max: null, description: "最近は 188-189cm が標準化。反応速度とポジショニングが重要。" },
+  CB: { height: 182, weight: 78, topSpeed: 28, vo2max: 58, description: "高身長化傾向（180cm 以上必須）。スピードより判断力と競争力を重視。" },
+  SB: { height: 179, weight: 75, topSpeed: 31, vo2max: 65, description: "CB より小柄でスピード重視。走行距離が長く VO2max が最高値クラス。" },
+  CH: { height: 175, weight: 70, topSpeed: 29, vo2max: 68, description: "技術・視野を優先。最高走行距離を記録。ボール保持回数が多い。" },
+  SH: { height: 173, weight: 68, topSpeed: 32, vo2max: 66, description: "最も小柄で軽量。スピード＆スタミナが最重要。ボール保持が多い。" },
+  FW: { height: 179, weight: 74, topSpeed: 35, vo2max: 60, description: "二峰分布（175cm と 185cm）。最高速度が最も速い。アタッカーの必須スキル。" },
+};
+
+/** ポジション（簡略版）から詳細ポジションへマッピング */
+function mapToDetailedPosition(position: Position, isCenter: boolean = true): DetailedPosition {
+  if (position === "GK") return "GK";
+  if (position === "DF") return isCenter ? "CB" : "SB";
+  if (position === "MF") return isCenter ? "CH" : "SH";
+  return "FW";
+}
+
+/** 詳細ポジションのデータを取得 */
+export function getDetailedPositionData(position: Position, isCenter: boolean = true): (typeof J1_DETAILED_AVERAGE)[DetailedPosition] {
+  const detailed = mapToDetailedPosition(position, isCenter);
+  return J1_DETAILED_AVERAGE[detailed];
 }
