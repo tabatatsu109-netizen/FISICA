@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { readinessScore, sleepScore, dailyNutritionScore } from "./score";
-import { bmi, targetBmi, targetWeight, categoryLabel, type Position, type Sex } from "./benchmark";
+import { bmi, targetBmi, targetWeight, categoryLabel, compareToJleague, type Position, type Sex } from "./benchmark";
 import type { DailyRecord, PlayerProfile, User } from "@prisma/client";
 
 export type PlayerWithProfile = User & { profile: PlayerProfile | null };
@@ -206,11 +206,13 @@ export type CoachPlayerRow = {
   latestReadiness: number | null;
   avgSleep7: number | null;
   latestWeight: number | null;
+  latestHeight: number | null;
   weightDelta7: number | null;
   inputRate14: number;
   streakDays: number;
   weightGrowth30: number | null;
   heightGrowth30: number | null;
+  j1Percentile: number | null;
   alerts: string[];
 };
 
@@ -231,6 +233,7 @@ export async function getCoachOverview(): Promise<CoachPlayerRow[]> {
     const latestReadiness = latest(records, (r) => readinessScore(r));
     const avgSleep7 = avg(last7.map((r) => r.sleepHours).filter((v): v is number => v != null));
     const latestWeight = latest(records, (r) => r.weightKg);
+    const latestHeight = latest(records, (r) => r.heightCm);
 
     const weights7 = last7.filter((r) => r.weightKg != null);
     const weightDelta7 =
@@ -250,16 +253,23 @@ export async function getCoachOverview(): Promise<CoachPlayerRow[]> {
     const inputRate14 = last14.length / 14;
     if (inputRate14 < 0.5) alerts.push("入力率低下");
 
+    let j1Percentile: number | null = null;
+    if (latestHeight != null && latestWeight != null && player.profile) {
+      j1Percentile = compareToJleague(latestHeight, latestWeight, player.profile.position as Position).percentile;
+    }
+
     rows.push({
       user: player,
       latestReadiness,
       avgSleep7,
       latestWeight,
+      latestHeight,
       weightDelta7,
       inputRate14,
       streakDays: streak(records),
       weightGrowth30,
       heightGrowth30,
+      j1Percentile,
       alerts,
     });
   }

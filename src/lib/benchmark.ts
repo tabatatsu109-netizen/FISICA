@@ -38,3 +38,34 @@ export function targetWeight(heightCm: number, target: number): number {
 export function categoryLabel(birthDate: Date, today = new Date()): string {
   return `U${ageCategory(birthDate, today)}`;
 }
+
+/** Jリーグ平均値（2026年度 J1 全選手のポジション別データ）*/
+const J1_AVERAGE = {
+  GK: { height: 188, weight: 84 },
+  DF: { height: 181, weight: 75 },
+  MF: { height: 174, weight: 69 },
+  FW: { height: 179, weight: 74 },
+};
+
+/** ポジションから Jリーグ平均値を取得 */
+export function jleagueAverage(position: Position): { height: number; weight: number } {
+  return J1_AVERAGE[position];
+}
+
+/** 選手の身長・体重と Jリーグ平均を比較 */
+export function compareToJleague(
+  heightCm: number,
+  weightKg: number,
+  position: Position
+): { heightDiff: number; weightDiff: number; bmiDiff: number; percentile: number } {
+  const avg = J1_AVERAGE[position];
+  const playerBmi = bmi(weightKg, heightCm);
+  const avgBmi = bmi(avg.weight, avg.height);
+
+  return {
+    heightDiff: heightCm - avg.height,
+    weightDiff: weightKg - avg.weight,
+    bmiDiff: playerBmi - avgBmi,
+    percentile: Math.round(Math.min(Math.max((heightCm / avg.height) * 100, 0), 100)),
+  };
+}

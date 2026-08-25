@@ -96,6 +96,7 @@ export default async function CoachDashboard() {
               <th className="pb-2 font-medium text-right">睡眠(7日)</th>
               <th className="pb-2 font-medium text-right">体重</th>
               <th className="pb-2 font-medium text-right">7日変化</th>
+              <th className="pb-2 font-medium text-right">プロ基準</th>
               <th className="pb-2 font-medium text-right">入力率</th>
             </tr>
           </thead>
@@ -126,6 +127,7 @@ export default async function CoachDashboard() {
                     "–"
                   )}
                 </td>
+                <td className="py-2.5 text-right tabular">{r.j1Percentile != null ? `${r.j1Percentile}%` : "–"}</td>
                 <td className="py-2.5 text-right tabular">{Math.round(r.inputRate14 * 100)}%</td>
               </tr>
             ))}

@@ -6,7 +6,7 @@ import { ScoreGauge } from "@/components/ScoreGauge";
 import { WeightChart, SleepChart, ReadinessChart, NutritionBars } from "@/components/charts";
 import { Avatar } from "@/components/Avatar";
 import { PhotoUpload } from "@/components/PhotoUpload";
-import { bmi, targetBmi, targetWeight, type Position, type Sex } from "@/lib/benchmark";
+import { bmi, targetBmi, targetWeight, compareToJleague, jleagueAverage, type Position, type Sex } from "@/lib/benchmark";
 
 export default async function PlayerHome({ searchParams }: PageProps<"/player">) {
   const session = (await getSession())!;
@@ -80,6 +80,38 @@ export default async function PlayerHome({ searchParams }: PageProps<"/player">)
           </p>
         </div>
       </section>
+
+      {latestHeight != null && latestWeight != null && profile ? (
+        <section className="card p-4 border-accent/20 bg-paper-alt">
+          <h3 className="font-bold text-sm mb-3">Jリーグ基準との比較</h3>
+          {(() => {
+            const j1 = jleagueAverage(profile.position as Position);
+            const comparison = compareToJleague(latestHeight, latestWeight, profile.position as Position);
+            return (
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between items-start">
+                  <span className="text-ink-3">身長</span>
+                  <div className="text-right">
+                    <p className="font-mono text-accent">{latestHeight.toFixed(1)}cm</p>
+                    <p className="text-xs text-ink-3">平均 {j1.height}cm {comparison.heightDiff >= 0 ? "+" : ""}{comparison.heightDiff}cm</p>
+                  </div>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-ink-3">体重</span>
+                  <div className="text-right">
+                    <p className="font-mono text-accent">{latestWeight.toFixed(1)}kg</p>
+                    <p className="text-xs text-ink-3">平均 {j1.weight}kg {comparison.weightDiff >= 0 ? "+" : ""}{comparison.weightDiff}kg</p>
+                  </div>
+                </div>
+                <div className="pt-2 border-t border-line-soft flex justify-between items-center">
+                  <span className="font-bold text-ink-2">プロ基準達成度</span>
+                  <span className="text-lg font-black text-accent">{comparison.percentile}%</span>
+                </div>
+              </div>
+            );
+          })()}
+        </section>
+      ) : null}
 
       <section className="card p-4">
         <h3 className="font-bold text-sm mb-2">体重の推移(28日)</h3>
