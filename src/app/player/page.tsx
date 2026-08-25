@@ -93,14 +93,14 @@ export default async function PlayerHome({ searchParams }: PageProps<"/player">)
                   <span className="text-ink-3">身長</span>
                   <div className="text-right">
                     <p className="font-mono text-accent">{latestHeight.toFixed(1)}cm</p>
-                    <p className="text-xs text-ink-3">平均 {j1.height}cm {comparison.heightDiff >= 0 ? "+" : ""}{comparison.heightDiff}cm</p>
+                    <p className="text-xs text-ink-3">平均 {j1.height}cm {comparison.heightDiff >= 0 ? "+" : ""}{comparison.heightDiff.toFixed(1)}cm</p>
                   </div>
                 </div>
                 <div className="flex justify-between items-start">
                   <span className="text-ink-3">体重</span>
                   <div className="text-right">
                     <p className="font-mono text-accent">{latestWeight.toFixed(1)}kg</p>
-                    <p className="text-xs text-ink-3">平均 {j1.weight}kg {comparison.weightDiff >= 0 ? "+" : ""}{comparison.weightDiff}kg</p>
+                    <p className="text-xs text-ink-3">平均 {j1.weight}kg {comparison.weightDiff >= 0 ? "+" : ""}{comparison.weightDiff.toFixed(1)}kg</p>
                   </div>
                 </div>
                 <div className="pt-2 border-t border-line-soft flex justify-between items-center">
