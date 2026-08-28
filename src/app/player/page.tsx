@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getSession } from "@/lib/session";
-import { getRecentRecords, buildSeries, streak, todayStr, getPlayer } from "@/lib/data";
+import { getRecentRecords, buildSeries, streak, todayStr, getPlayer, getWeeklyWorkoutSummary } from "@/lib/data";
 import { readinessScore } from "@/lib/score";
 import { ScoreGauge } from "@/components/ScoreGauge";
 import { WeightChart, SleepChart, ReadinessChart, NutritionBars } from "@/components/charts";
@@ -11,7 +11,11 @@ import { bmi, targetBmi, targetWeight, compareToJleague, jleagueAverage, type Po
 export default async function PlayerHome({ searchParams }: PageProps<"/player">) {
   const session = (await getSession())!;
   const { saved } = await searchParams;
-  const [player, records] = await Promise.all([getPlayer(session.userId), getRecentRecords(session.userId, 28)]);
+  const [player, records, workoutWeek] = await Promise.all([
+    getPlayer(session.userId),
+    getRecentRecords(session.userId, 28),
+    getWeeklyWorkoutSummary(session.userId),
+  ]);
   const series = buildSeries(records, 28);
   const today = todayStr();
   const todayRecord = records.find((r) => r.date === today) ?? null;
@@ -112,6 +116,21 @@ export default async function PlayerHome({ searchParams }: PageProps<"/player">)
           })()}
         </section>
       ) : null}
+
+      <Link href="/player/strength" className="card p-4 flex items-center justify-between">
+        <div>
+          <p className="text-xs text-ink-3">今週の筋トレ</p>
+          <p className="text-2xl font-black tabular mt-1">
+            {workoutWeek.sessionDays}
+            <span className="text-sm font-medium text-ink-3 ml-1">日</span>
+            <span className="text-sm font-medium text-ink-3 ml-3 tabular">{workoutWeek.totalSets} セット</span>
+          </p>
+          <p className="text-xs text-ink-3 mt-1 tabular">
+            総挙上量 {workoutWeek.totalVolumeKg.toLocaleString("ja-JP")} kg
+          </p>
+        </div>
+        <span className="text-ink-3 text-sm">記録を見る →</span>
+      </Link>
 
       <section className="card p-4">
         <h3 className="font-bold text-sm mb-2">体重の推移(28日)</h3>

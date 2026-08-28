@@ -46,9 +46,30 @@ model DailyRecord {
   rpe          Int? // 1..10 トレーニング強度
   mealsJson    String? // {"breakfast":{"ate":true,"tags":["主食",...]},...}
   note         String?
+  workouts     WorkoutEntry[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   @@unique([userId, date])
   @@index([date])
+}
+
+model WorkoutEntry {
+  id        String      @id @default(cuid())
+  recordId  String
+  record    DailyRecord @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  userId    String // 非正規化。ランキング/推移クエリを join なしで引くため
+  date      String // "YYYY-MM-DD" (DailyRecord.date と同じ形式)
+  exercise  String // src/lib/workout.ts の EXERCISES の key
+  order     Int // 画面上の並び順
+  weightKg  Float? // WEIGHT種目の重量 / BODYWEIGHT種目の加重。TIME種目は null
+  reps      Int? // WEIGHT / BODYWEIGHT種目の回数
+  seconds   Int? // TIME種目(プランク等)の秒数
+  sets      Int
+  rpe       Int? // 1..10 その種目のきつさ
+  createdAt DateTime    @default(now())
+
+  @@index([userId, date])
+  @@index([userId, exercise, date])
+  @@index([recordId])
 }

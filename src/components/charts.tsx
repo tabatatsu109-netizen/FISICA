@@ -22,6 +22,7 @@ const GRID = "#2c2c2a";
 const BLUE = "#3987e5";
 const AQUA = "#199e70";
 const ORANGE = "#d95926";
+const LIME = "#a3e635";
 
 const axisProps = {
   stroke: GRID,
@@ -153,6 +154,65 @@ export function GrowthSparkline({ data, color, unit }: { data: Point[]; color?: 
         <Tooltip {...tooltipStyle} formatter={(v) => [`${v} ${unit}`, ""]} labelFormatter={labelFormatter} />
         <Line type="monotone" dataKey="value" stroke={color ?? BLUE} strokeWidth={2} dot={false} connectNulls activeDot={{ r: 4 }} isAnimationActive={false} />
       </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** 筋トレ: 推定1RM・体重比・最高回数・最長時間などの推移 */
+export function StrengthChart({
+  data,
+  unit,
+  label,
+  decimals = 1,
+}: {
+  data: Point[];
+  unit: string;
+  label: string;
+  /** 目盛りの小数桁。体重比は2、回数・秒数は0を渡す */
+  decimals?: number;
+}) {
+  const values = data.filter((d) => d.value != null).map((d) => d.value as number);
+  if (values.length === 0) return <EmptyChart />;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  // 体重比(1.7倍前後)と1RM(100kg超)の両方を扱うので、余白は値のスケールに比例させる
+  const pad = Math.max((max - min) * 0.25, max * 0.05, 0.01);
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <LineChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -4 }}>
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="date" tickFormatter={shortDate} {...axisProps} minTickGap={28} />
+        <YAxis
+          domain={[Math.max(0, min - pad), max + pad]}
+          allowDecimals={decimals > 0}
+          {...axisProps}
+          width={48}
+          tickFormatter={(v: number) => String(Number(v.toFixed(decimals)))}
+        />
+        <Tooltip {...tooltipStyle} formatter={(v) => [`${v} ${unit}`, label]} labelFormatter={labelFormatter} />
+        <Line type="monotone" dataKey="value" stroke={LIME} strokeWidth={2} dot={{ r: 3, fill: LIME }} connectNulls activeDot={{ r: 5 }} isAnimationActive={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
+
+/** 筋トレ: 日別のセット数 */
+export function WorkoutVolumeBars({ data }: { data: Point[] }) {
+  const hasData = data.some((d) => (d.value ?? 0) > 0);
+  if (!hasData) return <EmptyChart height={160} />;
+  return (
+    <ResponsiveContainer width="100%" height={160}>
+      <BarChart data={data} margin={{ top: 8, right: 8, bottom: 0, left: -4 }}>
+        <CartesianGrid stroke={GRID} vertical={false} />
+        <XAxis dataKey="date" tickFormatter={shortDate} {...axisProps} minTickGap={28} />
+        <YAxis allowDecimals={false} {...axisProps} width={32} />
+        <Tooltip {...tooltipStyle} formatter={(v) => [`${v} セット`, "筋トレ"]} labelFormatter={labelFormatter} cursor={{ fill: "rgba(255,255,255,0.05)" }} />
+        <Bar dataKey="value" radius={[3, 3, 0, 0]} maxBarSize={14} isAnimationActive={false}>
+          {data.map((d, i) => (
+            <Cell key={i} fill={(d.value ?? 0) > 0 ? LIME : GRID} />
+          ))}
+        </Bar>
+      </BarChart>
     </ResponsiveContainer>
   );
 }

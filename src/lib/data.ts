@@ -1,7 +1,19 @@
 import { prisma } from "./db";
 import { readinessScore, sleepScore, dailyNutritionScore } from "./score";
 import { bmi, targetBmi, targetWeight, categoryLabel, compareToJleague, type Position, type Sex } from "./benchmark";
-import type { DailyRecord, PlayerProfile, User } from "@prisma/client";
+import type { DailyRecord, PlayerProfile, User, WorkoutEntry } from "@prisma/client";
+import {
+  DEFAULT_EXERCISE,
+  EXERCISES,
+  bodyweightRatio,
+  entryMetric,
+  entryVolumeKg,
+  exerciseByKey,
+  metricKind,
+  type Exercise,
+  type MetricKind,
+  type WorkoutLike,
+} from "./workout";
 
 export type PlayerWithProfile = User & { profile: PlayerProfile | null };
 
@@ -274,4 +286,189 @@ export async function getCoachOverview(): Promise<CoachPlayerRow[]> {
     });
   }
   return rows;
+}
+
+/* ── 筋トレ ───────────────────────────────────────────── */
+
+export type Point = { date: string; value: number | null };
+
+export async function getWorkoutEntries(userId: string, days: number): Promise<WorkoutEntry[]> {
+  const since = lastDates(days)[0];
+  return prisma.workoutEntry.findMany({
+    where: { userId, date: { gte: since } },
+    orderBy: [{ date: "asc" }, { order: "asc" }],
+  });
+}
+
+/** 日付 → 体重。記録のない日は直近の値で埋める(前方補完 → 先頭は後方補完) */
+function weightByDate(records: DailyRecord[], dates: string[]): Map<string, number | null> {
+  const known = new Map<string, number>();
+  for (const r of records) if (r.weightKg != null) known.set(r.date, r.weightKg);
+  const out = new Map<string, number | null>();
+  let carried: number | null = null;
+  for (const date of dates) {
+    const w = known.get(date);
+    if (w != null) carried = w;
+    out.set(date, carried);
+  }
+  if (carried != null) {
+    let firstKnown: number | null = null;
+    for (const date of dates) {
+      const v = out.get(date) ?? null;
+      if (v != null) {
+        firstKnown = v;
+        break;
+      }
+    }
+    for (const date of dates) {
+      if (out.get(date) == null) out.set(date, firstKnown);
+      else break;
+    }
+  }
+  return out;
+}
+
+/** 1日ぶんの記録から、その種目のベスト指標値を取る */
+function bestMetricOf(entries: WorkoutLike[]): number | null {
+  let best: number | null = null;
+  for (const e of entries) {
+    const v = entryMetric(e);
+    if (v != null && (best == null || v > best)) best = v;
+  }
+  return best;
+}
+
+export type ExerciseBest = {
+  key: string;
+  label: string;
+  kind: MetricKind;
+  best: number;
+  prevBest: number | null;
+  delta: number | null;
+  ratio: number | null;
+};
+
+export type StrengthView = {
+  days: number;
+  exercise: Exercise;
+  kind: MetricKind;
+  metricSeries: Point[];
+  ratioSeries: Point[] | null;
+  setsSeries: Point[];
+  loggedExercises: string[];
+  sessionDays: number;
+  totalSets: number;
+  totalVolumeKg: number;
+  avgRpe: number | null;
+  latestWeightKg: number | null;
+  bests: ExerciseBest[];
+  loadWarning: string | null;
+};
+
+/**
+ * 筋トレ画面のデータ一式。
+ * 前期間との比較のため直近 days*2 日ぶんを1回で取り、JS側で当期/前期に切る。
+ */
+export async function getStrengthView(userId: string, days: number, exerciseKey: string): Promise<StrengthView> {
+  const exercise = exerciseByKey(exerciseKey) ?? exerciseByKey(DEFAULT_EXERCISE)!;
+  const kind = metricKind(exercise.type);
+  const windowDates = lastDates(days * 2);
+  const currentDates = windowDates.slice(days);
+  const currentStart = currentDates[0];
+
+  const [entries, records] = await Promise.all([
+    getWorkoutEntries(userId, days * 2),
+    getRecentRecords(userId, days * 2),
+  ]);
+
+  const current = entries.filter((e) => e.date >= currentStart);
+  const previous = entries.filter((e) => e.date < currentStart);
+  const weights = weightByDate(records, windowDates);
+
+  // 選択種目の推移
+  const byDate = new Map<string, WorkoutEntry[]>();
+  for (const e of current) {
+    if (e.exercise !== exercise.key) continue;
+    const list = byDate.get(e.date) ?? [];
+    list.push(e);
+    byDate.set(e.date, list);
+  }
+  const metricSeries: Point[] = currentDates.map((date) => ({
+    date,
+    value: bestMetricOf(byDate.get(date) ?? []),
+  }));
+  const ratioSeries: Point[] | null =
+    kind === "ONE_RM"
+      ? metricSeries.map((p) => ({ date: p.date, value: bodyweightRatio(p.value, weights.get(p.date) ?? null) }))
+      : null;
+
+  // 日別セット数
+  const setsByDate = new Map<string, number>();
+  for (const e of current) setsByDate.set(e.date, (setsByDate.get(e.date) ?? 0) + e.sets);
+  const setsSeries: Point[] = currentDates.map((date) => ({ date, value: setsByDate.get(date) ?? 0 }));
+
+  // サマリー
+  const sessionDays = new Set(current.map((e) => e.date)).size;
+  const totalSets = current.reduce((s, e) => s + e.sets, 0);
+  const totalVolumeKg = Math.round(current.reduce((s, e) => s + entryVolumeKg(e), 0));
+  const rpes = current.map((e) => e.rpe).filter((v): v is number => v != null);
+  const avgRpe = avg(rpes);
+  const latestWeightKg = weights.get(currentDates[currentDates.length - 1]) ?? null;
+
+  // 種目別ベスト(coreを先に、記録がある種目だけ)
+  const loggedExercises = [...new Set(current.map((e) => e.exercise))];
+  const bests: ExerciseBest[] = [];
+  for (const ex of EXERCISES) {
+    const now = bestMetricOf(current.filter((e) => e.exercise === ex.key));
+    if (now == null) continue;
+    const prevBest = bestMetricOf(previous.filter((e) => e.exercise === ex.key));
+    const k = metricKind(ex.type);
+    bests.push({
+      key: ex.key,
+      label: ex.label,
+      kind: k,
+      best: now,
+      prevBest,
+      delta: prevBest != null ? Math.round((now - prevBest) * 10) / 10 : null,
+      ratio: k === "ONE_RM" ? bodyweightRatio(now, latestWeightKg) : null,
+    });
+  }
+  bests.sort((a, b) => Number(exerciseByKey(b.key)?.core ?? false) - Number(exerciseByKey(a.key)?.core ?? false));
+
+  // 直近7日と その前7日のセット数を比べて、増やしすぎを注意喚起する
+  const last7Start = lastDates(7)[0];
+  const prev7Start = lastDates(14)[0];
+  const sets7 = entries.filter((e) => e.date >= last7Start).reduce((s, e) => s + e.sets, 0);
+  const setsPrev7 = entries.filter((e) => e.date >= prev7Start && e.date < last7Start).reduce((s, e) => s + e.sets, 0);
+  const loadWarning =
+    sets7 >= 12 && setsPrev7 > 0 && sets7 >= setsPrev7 * 1.3
+      ? `今週のセット数が前週比 +${Math.round((sets7 / setsPrev7 - 1) * 100)}%(${setsPrev7}→${sets7}セット)。増やしすぎに注意して、睡眠と食事で回復を優先しましょう。`
+      : null;
+
+  return {
+    days,
+    exercise,
+    kind,
+    metricSeries,
+    ratioSeries,
+    setsSeries,
+    loggedExercises,
+    sessionDays,
+    totalSets,
+    totalVolumeKg,
+    avgRpe,
+    latestWeightKg,
+    bests,
+    loadWarning,
+  };
+}
+
+/** ホーム用の軽いサマリー(直近7日) */
+export async function getWeeklyWorkoutSummary(userId: string): Promise<{ sessionDays: number; totalSets: number; totalVolumeKg: number }> {
+  const entries = await getWorkoutEntries(userId, 7);
+  return {
+    sessionDays: new Set(entries.map((e) => e.date)).size,
+    totalSets: entries.reduce((s, e) => s + e.sets, 0),
+    totalVolumeKg: Math.round(entries.reduce((s, e) => s + entryVolumeKg(e), 0)),
+  };
 }
