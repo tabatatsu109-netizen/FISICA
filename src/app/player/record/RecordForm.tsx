@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { saveRecord } from "@/lib/actions/record";
 import { MEAL_KEYS, MEAL_LABELS, MEAL_TAGS, type Meals } from "@/lib/meals";
+import {
+  DEFAULT_EXERCISE,
+  EXERCISES,
+  MAX_WORKOUT_ROWS,
+  estimate1RM,
+  exerciseByKey,
+  type ExerciseKey,
+} from "@/lib/workout";
 
 type Defaults = {
   date: string;
@@ -16,6 +24,16 @@ type Defaults = {
   rpe: number | null;
   meals: Meals;
   note: string;
+  workouts: WorkoutRow[];
+};
+
+export type WorkoutRow = {
+  exercise: ExerciseKey;
+  weightKg: string;
+  reps: string;
+  seconds: string;
+  sets: string;
+  rpe: number;
 };
 
 const SCALE_EMOJI = ["😫", "😕", "😐", "🙂", "😄"];
@@ -64,6 +82,8 @@ function ScaleInput({
 export function RecordForm({ defaults }: { defaults: Defaults }) {
   const [sleepHours, setSleepHours] = useState(defaults.sleepHours ?? 7);
   const [rpe, setRpe] = useState(defaults.rpe ?? 5);
+  const [workoutOn, setWorkoutOn] = useState(defaults.workouts.length > 0);
+  const [workouts, setWorkouts] = useState<WorkoutRow[]>(defaults.workouts);
 
   return (
     <form action={saveRecord} className="flex flex-col gap-4">
@@ -143,6 +163,50 @@ export function RecordForm({ defaults }: { defaults: Defaults }) {
         {MEAL_KEYS.map((key) => (
           <MealInput key={key} mealKey={key} defaults={defaults.meals[key]} />
         ))}
+      </section>
+
+      <section className="card p-4 flex flex-col gap-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-bold text-sm">筋トレ記録</h3>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={workoutOn}
+            aria-label="筋トレ記録"
+            onClick={() => setWorkoutOn((v) => !v)}
+            className={`relative w-12 h-7 rounded-full transition-colors ${workoutOn ? "bg-accent" : "bg-surface-2 border border-white/10"}`}
+          >
+            <span
+              className={`absolute top-1 w-5 h-5 rounded-full transition-transform ${
+                workoutOn ? "translate-x-6 bg-[#0d0d0d]" : "translate-x-1 bg-ink-3"
+              }`}
+            />
+          </button>
+        </div>
+        {workoutOn && (
+          <div className="flex flex-col gap-3">
+            {workouts.length === 0 && (
+              <p className="text-xs text-ink-3">「+ 種目を追加」から今日やった種目を入れましょう。</p>
+            )}
+            {workouts.map((row, i) => (
+              <WorkoutInput
+                key={i}
+                row={row}
+                onChange={(next) => setWorkouts((rows) => rows.map((r, j) => (j === i ? next : r)))}
+                onRemove={() => setWorkouts((rows) => rows.filter((_, j) => j !== i))}
+              />
+            ))}
+            {workouts.length < MAX_WORKOUT_ROWS && (
+              <button
+                type="button"
+                onClick={() => setWorkouts((rows) => [...rows, emptyWorkoutRow()])}
+                className="rounded-xl border border-dashed border-white/20 py-2.5 text-sm text-ink-2"
+              >
+                + 種目を追加
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="card p-4">
@@ -243,6 +307,155 @@ function MealInput({
             </>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+export function emptyWorkoutRow(): WorkoutRow {
+  return { exercise: DEFAULT_EXERCISE, weightKg: "", reps: "", seconds: "", sets: "3", rpe: 6 };
+}
+
+const EXERCISE_PARTS = [...new Set(EXERCISES.map((e) => e.part))];
+
+function WorkoutInput({
+  row,
+  onChange,
+  onRemove,
+}: {
+  row: WorkoutRow;
+  onChange: (next: WorkoutRow) => void;
+  onRemove: () => void;
+}) {
+  const exercise = exerciseByKey(row.exercise) ?? EXERCISES[0];
+  const isTime = exercise.type === "TIME";
+  const isBodyweight = exercise.type === "BODYWEIGHT";
+  const oneRm = isTime ? null : estimate1RM(Number(row.weightKg) || null, Number(row.reps) || null);
+  const inputClass =
+    "bg-surface-2 border border-white/10 rounded-lg px-3 py-2 text-sm tabular outline-none focus:border-accent w-full";
+
+  return (
+    <div className="rounded-xl border border-white/10 bg-surface-2/40 p-3 flex flex-col gap-2.5">
+      <div className="flex items-center gap-2">
+        <select
+          name="w_exercise"
+          value={row.exercise}
+          onChange={(e) => onChange({ ...row, exercise: e.target.value as ExerciseKey })}
+          className="flex-1 bg-surface-2 border border-white/10 rounded-lg px-3 py-2 text-sm outline-none focus:border-accent"
+        >
+          {EXERCISE_PARTS.map((part) => (
+            <optgroup key={part} label={part}>
+              {EXERCISES.filter((e) => e.part === part).map((e) => (
+                <option key={e.key} value={e.key}>
+                  {e.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
+        <button type="button" onClick={onRemove} className="text-xs text-critical border border-critical/40 rounded-lg px-2.5 py-2">
+          削除
+        </button>
+      </div>
+
+      {/* 種目タイプに関係なく全フィールドを送る(サーバ側で行ごとの配列を揃えるため) */}
+      <div className="grid grid-cols-3 gap-2">
+        {isTime ? (
+          <input type="hidden" name="w_weight" value="" />
+        ) : (
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-3">{isBodyweight ? "加重 (kg)" : "重量 (kg)"}</span>
+            <input
+              name="w_weight"
+              type="number"
+              step="0.5"
+              min={0}
+              max={500}
+              inputMode="decimal"
+              value={row.weightKg}
+              onChange={(e) => onChange({ ...row, weightKg: e.target.value })}
+              placeholder={isBodyweight ? "自重" : "100"}
+              className={inputClass}
+            />
+          </label>
+        )}
+
+        {isTime ? (
+          <input type="hidden" name="w_reps" value="" />
+        ) : (
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-3">回数</span>
+            <input
+              name="w_reps"
+              type="number"
+              min={1}
+              max={100}
+              inputMode="numeric"
+              value={row.reps}
+              onChange={(e) => onChange({ ...row, reps: e.target.value })}
+              placeholder="5"
+              className={inputClass}
+            />
+          </label>
+        )}
+
+        {isTime ? (
+          <label className="flex flex-col gap-1">
+            <span className="text-[11px] text-ink-3">秒数</span>
+            <input
+              name="w_seconds"
+              type="number"
+              min={1}
+              max={3600}
+              inputMode="numeric"
+              value={row.seconds}
+              onChange={(e) => onChange({ ...row, seconds: e.target.value })}
+              placeholder="60"
+              className={inputClass}
+            />
+          </label>
+        ) : (
+          <input type="hidden" name="w_seconds" value="" />
+        )}
+
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] text-ink-3">セット数</span>
+          <input
+            name="w_sets"
+            type="number"
+            min={1}
+            max={20}
+            inputMode="numeric"
+            value={row.sets}
+            onChange={(e) => onChange({ ...row, sets: e.target.value })}
+            placeholder="3"
+            className={inputClass}
+          />
+        </label>
+      </div>
+
+      <div>
+        <div className="flex justify-between items-baseline mb-1">
+          <span className="text-[11px] text-ink-3">RPE (きつさ)</span>
+          <span className="text-sm font-black tabular text-accent">{row.rpe}</span>
+        </div>
+        <input
+          type="range"
+          name="w_rpe"
+          min={1}
+          max={10}
+          step={1}
+          value={row.rpe}
+          onChange={(e) => onChange({ ...row, rpe: Number(e.target.value) })}
+          className="w-full"
+        />
+      </div>
+
+      {oneRm != null && (
+        <p className="text-[11px] text-ink-3">
+          推定1RM <span className="text-accent font-bold tabular">{oneRm.toFixed(1)}kg</span>
+          <span className="ml-2">(実測せず、今のセットから自動計算しています)</span>
+        </p>
       )}
     </div>
   );

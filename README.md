@@ -36,6 +36,17 @@ npm run dev               # http://localhost:3000
    - `DATABASE_URL` = Neonの接続文字列
    - `SESSION_SECRET` = 強いランダム値(`node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` で生成)
 
+### スキーマ変更時
+
+`npm run build` に `prisma db push` が含まれているため、**2回目以降はデプロイするだけで
+DBのスキーマが自動で追従する**。`prisma/schema.prisma` を変更したらプッシュすればよく、
+手動での `npx prisma db push` は不要(ローカル開発では従来どおり手で実行する)。
+
+- `--accept-data-loss` は意図的に付けていない。既存データが失われる差分が検出された場合は
+  ビルドが失敗し、デプロイされない。その場合は差分を確認して対処すること。
+- プレビューのビルドでもスキーマ反映が走る。プレビューと本番が同じ `DATABASE_URL` を
+  指している場合、古いブランチをデプロイするとスキーマがその時点まで巻き戻り得る。
+
 ### デモアカウント(シード後)
 | ロール | ID | パスワード |
 |---|---|---|

@@ -2,13 +2,15 @@ import { getSession } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { todayStr } from "@/lib/data";
 import { parseMeals } from "@/lib/meals";
-import { RecordForm } from "./RecordForm";
+import { RecordForm, type WorkoutRow } from "./RecordForm";
+import { type ExerciseKey } from "@/lib/workout";
 
 export default async function RecordPage() {
   const session = (await getSession())!;
   const date = todayStr();
   const existing = await prisma.dailyRecord.findUnique({
     where: { userId_date: { userId: session.userId, date } },
+    include: { workouts: { orderBy: { order: "asc" } } },
   });
   // 直近の身長を初期値に(毎日測らない前提)
   const lastHeight =
@@ -21,6 +23,16 @@ export default async function RecordPage() {
       })
     )?.heightCm ??
     null;
+
+  // 入力済みの筋トレを画面の行に戻す
+  const workouts: WorkoutRow[] = (existing?.workouts ?? []).map((w) => ({
+    exercise: w.exercise as ExerciseKey,
+    weightKg: w.weightKg != null ? String(w.weightKg) : "",
+    reps: w.reps != null ? String(w.reps) : "",
+    seconds: w.seconds != null ? String(w.seconds) : "",
+    sets: String(w.sets),
+    rpe: w.rpe ?? 6,
+  }));
 
   const [y, m, d] = date.split("-");
 
@@ -45,6 +57,7 @@ export default async function RecordPage() {
           rpe: existing?.rpe ?? null,
           meals: parseMeals(existing?.mealsJson),
           note: existing?.note ?? "",
+          workouts,
         }}
       />
     </div>

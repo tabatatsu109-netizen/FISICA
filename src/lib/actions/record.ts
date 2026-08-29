@@ -5,12 +5,63 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { getSession } from "@/lib/session";
 import { MEAL_KEYS, MEAL_TAGS, type Meals, type MealTag } from "@/lib/meals";
+import { MAX_WORKOUT_ROWS, exerciseByKey } from "@/lib/workout";
 
 function numOrNull(v: FormDataEntryValue | null, min: number, max: number): number | null {
   if (v == null || v === "") return null;
   const n = Number(v);
   if (!Number.isFinite(n)) return null;
   return Math.min(Math.max(n, min), max);
+}
+
+function intOrNull(v: FormDataEntryValue | null, min: number, max: number): number | null {
+  const n = numOrNull(v, min, max);
+  return n == null ? null : Math.round(n);
+}
+
+type WorkoutRowInput = {
+  exercise: string;
+  order: number;
+  weightKg: number | null;
+  reps: number | null;
+  seconds: number | null;
+  sets: number;
+  rpe: number | null;
+};
+
+/**
+ * 筋トレ行を FormData から取り出す。
+ * 各行は種目に関係なく全フィールドを必ず送る作りなので、getAll() の配列は行ごとに揃う。
+ */
+function parseWorkoutRows(formData: FormData): WorkoutRowInput[] {
+  const exercises = formData.getAll("w_exercise").map(String);
+  const weights = formData.getAll("w_weight");
+  const reps = formData.getAll("w_reps");
+  const seconds = formData.getAll("w_seconds");
+  const sets = formData.getAll("w_sets");
+  const rpes = formData.getAll("w_rpe");
+
+  const rows: WorkoutRowInput[] = [];
+  for (let i = 0; i < exercises.length && rows.length < MAX_WORKOUT_ROWS; i++) {
+    const exercise = exerciseByKey(exercises[i]);
+    if (!exercise) continue; // 許可リストにない種目は捨てる
+    const isTime = exercise.type === "TIME";
+    const weightKg = isTime ? null : numOrNull(weights[i] ?? null, 0, 500);
+    const repCount = isTime ? null : intOrNull(reps[i] ?? null, 1, 100);
+    const sec = isTime ? intOrNull(seconds[i] ?? null, 1, 3600) : null;
+    // 実質空の行(回数も秒数も入っていない)は保存しない
+    if (isTime ? sec == null : repCount == null) continue;
+    rows.push({
+      exercise: exercise.key,
+      order: rows.length,
+      weightKg,
+      reps: repCount,
+      seconds: sec,
+      sets: intOrNull(sets[i] ?? null, 1, 20) ?? 1,
+      rpe: intOrNull(rpes[i] ?? null, 1, 10),
+    });
+  }
+  return rows;
 }
 
 export async function saveRecord(formData: FormData) {
@@ -50,12 +101,26 @@ export async function saveRecord(formData: FormData) {
     note: String(formData.get("note") ?? "").slice(0, 500) || null,
   };
 
-  await prisma.dailyRecord.upsert({
+  const record = await prisma.dailyRecord.upsert({
     where: { userId_date: { userId: session.userId, date } },
     create: { userId: session.userId, date, ...data },
     update: data,
   });
 
+  // その日の筋トレはまるごと上書きする(日次レコードの upsert と同じ考え方)
+  const workoutRows = parseWorkoutRows(formData);
+  await prisma.$transaction([
+    prisma.workoutEntry.deleteMany({ where: { recordId: record.id } }),
+    ...(workoutRows.length > 0
+      ? [
+          prisma.workoutEntry.createMany({
+            data: workoutRows.map((row) => ({ ...row, recordId: record.id, userId: session.userId, date })),
+          }),
+        ]
+      : []),
+  ]);
+
   revalidatePath("/player");
+  revalidatePath("/player/strength");
   redirect("/player?saved=1");
 }

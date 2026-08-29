@@ -25,12 +25,15 @@ export default async function PlayerLayout({ children }: LayoutProps<"/player">)
       </header>
       <main className="flex-1 px-4">{children}</main>
       <nav className="fixed bottom-0 inset-x-0 bg-surface-1/95 backdrop-blur border-t border-white/10">
-        <div className="max-w-lg mx-auto grid grid-cols-4 text-center text-[11px]">
+        <div className="max-w-lg mx-auto grid grid-cols-5 text-center text-[11px]">
           <Link href="/player" className="py-3 text-ink-2 hover:text-ink">
             <span className="block text-lg leading-none mb-0.5">🏠</span>ホーム
           </Link>
           <Link href="/player/record" className="py-3 text-ink-2 hover:text-ink">
             <span className="block text-lg leading-none mb-0.5">✏️</span>今日の記録
+          </Link>
+          <Link href="/player/strength" className="py-3 text-ink-2 hover:text-ink">
+            <span className="block text-lg leading-none mb-0.5">💪</span>筋トレ
           </Link>
           <Link href="/player/reference" className="py-3 text-ink-2 hover:text-ink">
             <span className="block text-lg leading-none mb-0.5">📊</span>参考データ
