@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 const PASSWORD = "demo1234";
+const TEAM_CODE = "demo";
 
 const PLAYERS = [
   { loginId: "sato", name: "佐藤 蓮", position: "FW", grade: 3, jersey: 9, birth: "2008-06-14", baseH: 174.2, baseW: 64.5, discipline: 0.9 },
@@ -50,11 +51,17 @@ async function main() {
   await prisma.dailyRecord.deleteMany();
   await prisma.playerProfile.deleteMany();
   await prisma.user.deleteMany();
+  await prisma.team.deleteMany();
 
   const hash = await bcrypt.hash(PASSWORD, 10);
 
+  // デモ用チーム。ログインIDは "チームコード-個人ID" で保存する
+  const team = await prisma.team.create({
+    data: { code: TEAM_CODE, name: "デモ高校サッカー部" },
+  });
+
   await prisma.user.create({
-    data: { loginId: "coach", passwordHash: hash, name: "監督 剛", role: "COACH" },
+    data: { loginId: `${TEAM_CODE}-coach`, passwordHash: hash, name: "監督 剛", role: "COACH", teamId: team.id },
   });
 
   const today = new Date();
@@ -64,10 +71,11 @@ async function main() {
     const p = PLAYERS[pi];
     const user = await prisma.user.create({
       data: {
-        loginId: p.loginId,
+        loginId: `${TEAM_CODE}-${p.loginId}`,
         passwordHash: hash,
         name: p.name,
         role: "PLAYER",
+        teamId: team.id,
         profile: {
           create: {
             birthDate: new Date(p.birth),
@@ -117,7 +125,7 @@ async function main() {
     console.log(`${p.name}: ${records.length} records`);
   }
 
-  console.log("Seed done. Login: coach / demo1234, players e.g. sato / demo1234");
+  console.log(`Seed done. Login: team ${TEAM_CODE} / coach / ${PASSWORD}, players e.g. sato / ${PASSWORD}`);
 }
 
 main()
