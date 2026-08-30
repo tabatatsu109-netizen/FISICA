@@ -14,11 +14,19 @@ export async function savePhoto(formData: FormData) {
   if (!/^data:image\/(jpeg|png|webp);base64,/.test(photoData)) throw new Error("invalid image");
   if (photoData.length > MAX_DATA_URL_LENGTH) throw new Error("image too large");
 
-  // 選手は自分の写真のみ、監督は任意の選手の写真を設定できる
+  // 選手は自分の写真のみ、監督は「自チームの」選手の写真を設定できる
   let targetUserId = session.userId;
   if (session.role === "COACH") {
     const requested = String(formData.get("userId") ?? "");
-    if (requested) targetUserId = requested;
+    if (requested && requested !== session.userId) {
+      const coach = await prisma.user.findUnique({ where: { id: session.userId }, select: { teamId: true } });
+      const target = await prisma.user.findFirst({
+        where: { id: requested, teamId: coach?.teamId ?? "", role: "PLAYER" },
+        select: { id: true },
+      });
+      if (!target) throw new Error("forbidden");
+      targetUserId = target.id;
+    }
   }
 
   await prisma.playerProfile.update({

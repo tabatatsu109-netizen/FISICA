@@ -4,21 +4,33 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/db";
 import { setSessionCookie, clearSessionCookie } from "@/lib/session";
+import { buildLoginId, type Role } from "@/lib/team";
 
 export type LoginState = { error?: string };
 
-export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
-  const loginId = String(formData.get("loginId") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
-  if (!loginId || !password) return { error: "IDとパスワードを入力してください" };
+const HOME_BY_ROLE: Record<Role, string> = {
+  ADMIN: "/admin",
+  COACH: "/coach",
+  PLAYER: "/player",
+};
 
+export async function login(_prev: LoginState, formData: FormData): Promise<LoginState> {
+  // チームコードは運営者(ADMIN)のみ空欄。選手・監督は必須。
+  const teamCode = String(formData.get("teamCode") ?? "").trim();
+  const personalId = String(formData.get("loginId") ?? "").trim();
+  const password = String(formData.get("password") ?? "");
+  if (!personalId || !password) return { error: "IDとパスワードを入力してください" };
+
+  const loginId = buildLoginId(teamCode, personalId);
   const user = await prisma.user.findUnique({ where: { loginId } });
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
-    return { error: "IDまたはパスワードが違います" };
+    // どれが違うかは伝えない(存在するIDの推測を防ぐ)
+    return { error: "チームコード・ID・パスワードのいずれかが違います" };
   }
 
-  await setSessionCookie({ userId: user.id, role: user.role as "COACH" | "PLAYER" });
-  redirect(user.role === "COACH" ? "/coach" : "/player");
+  const role = user.role as Role;
+  await setSessionCookie({ userId: user.id, role });
+  redirect(HOME_BY_ROLE[role] ?? "/player");
 }
 
 export async function logout() {
