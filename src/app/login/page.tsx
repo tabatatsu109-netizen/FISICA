@@ -17,6 +17,16 @@ export default function LoginPage() {
         </div>
         <form action={action} className="card p-6 flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
+            <span className="text-xs text-ink-2 font-medium">チームコード</span>
+            <input
+              name="teamCode"
+              autoComplete="organization"
+              autoCapitalize="none"
+              className="bg-surface-2 border border-white/10 rounded-lg px-3 py-2.5 text-base outline-none focus:border-accent"
+              placeholder="例: seiryo"
+            />
+          </label>
+          <label className="flex flex-col gap-1.5">
             <span className="text-xs text-ink-2 font-medium">ログインID</span>
             <input
               name="loginId"
@@ -43,8 +53,8 @@ export default function LoginPage() {
             {pending ? "ログイン中..." : "ログイン"}
           </button>
         </form>
-        <p className="text-ink-3 text-xs text-center mt-6">
-          デモ: 選手 sato / 監督 coach(パスワード demo1234)
+        <p className="text-ink-3 text-xs text-center mt-6 leading-relaxed">
+          チームコードとログインIDは、監督から配られたものを入力してください。
         </p>
       </div>
     </main>
