@@ -141,7 +141,13 @@ export function AdminForms({ teams }: { teams: AdminTeam[] }) {
             </div>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-2">初期パスワード(空欄なら自動生成)</span>
-              <input name="password" className={inputClass} placeholder="自動生成する場合は空欄" />
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                className={inputClass}
+                placeholder="自動生成する場合は空欄"
+              />
             </label>
             <Result state={coachState} />
             <button

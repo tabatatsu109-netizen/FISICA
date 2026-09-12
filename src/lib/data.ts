@@ -1,3 +1,12 @@
+// 画面に出すデータの取得層。
+//
+// 【重要】getCoachOverview 以外の関数は userId を受け取るだけで、
+// 「その userId を見てよいか」の判定はしない。呼び出し側の責任。
+// 必ず次のどちらかを通した userId だけを渡すこと:
+//   - 本人の画面        … getSession() の session.userId
+//   - 監督が選手を見る画面 … requireCoachTeam() + findTeamPlayer() を通過したID
+// ここを守らないと、他校の選手の身体データがURLを変えるだけで見えてしまう。
+
 import { prisma } from "./db";
 import { readinessScore, sleepScore, dailyNutritionScore } from "./score";
 import { bmi, targetBmi, targetWeight, categoryLabel, compareToJleague, type Position, type Sex } from "./benchmark";
