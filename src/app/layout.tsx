@@ -11,6 +11,8 @@ const notoSansJp = Noto_Sans_JP({
 export const metadata: Metadata = {
   title: "Fisica — 選手コンディション管理",
   description: "高校サッカー部のための選手成長・コンディション管理アプリ",
+  // 未成年の身体データを扱うので検索結果に出さない
+  robots: { index: false, follow: false },
 };
 
 export const viewport: Viewport = {
