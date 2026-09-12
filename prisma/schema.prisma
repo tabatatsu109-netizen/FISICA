@@ -34,6 +34,17 @@ model User {
   @@index([teamId])
 }
 
+/// ログインの連続失敗を記録して総当たりを止める。
+/// 存在しないログインIDも記録する。記録の有無で実在するIDが分かってしまうため。
+model LoginAttempt {
+  loginId     String    @id
+  failures    Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+
+  @@index([windowStart])
+}
+
 model PlayerProfile {
   id           String   @id @default(cuid())
   userId       String   @unique
@@ -47,9 +58,9 @@ model PlayerProfile {
 }
 
 model DailyRecord {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   date         String // "YYYY-MM-DD"
   weightKg     Float?
   heightCm     Float?
@@ -62,8 +73,8 @@ model DailyRecord {
   mealsJson    String? // {"breakfast":{"ate":true,"tags":["主食",...]},...}
   note         String?
   workouts     WorkoutEntry[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@unique([userId, date])
   @@index([date])
