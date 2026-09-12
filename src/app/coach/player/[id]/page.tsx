@@ -1,16 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPlayer, getRecentRecords, buildSeries, getRecordedMonths } from "@/lib/data";
+import { getRecentRecords, buildSeries, getRecordedMonths } from "@/lib/data";
+import { requireCoachTeam, findTeamPlayer } from "@/lib/guard";
 import { WeightChart, SleepChart, ReadinessChart } from "@/components/charts";
 import { KarteView } from "@/components/KarteView";
 import { Avatar } from "@/components/Avatar";
 import { PhotoUpload } from "@/components/PhotoUpload";
 
 export default async function CoachPlayerPage({ params, searchParams }: PageProps<"/coach/player/[id]">) {
+  const { teamId } = await requireCoachTeam();
   const { id } = await params;
   const { month } = await searchParams;
-  const player = await getPlayer(id);
-  if (!player || player.role !== "PLAYER") notFound();
+  // 他チームの選手は存在しないものとして扱う
+  const player = await findTeamPlayer(id, teamId);
+  if (!player) notFound();
 
   const months = await getRecordedMonths(id);
   const selectedMonth = typeof month === "string" && /^\d{4}-\d{2}$/.test(month) ? month : null;

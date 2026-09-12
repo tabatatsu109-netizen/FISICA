@@ -8,15 +8,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Team {
+  id        String   @id @default(cuid())
+  code      String   @unique // ログイン時に入力する短い英数字 例: "seiryo"
+  name      String // 表示名 例: "青陵高校サッカー部"
+  createdAt DateTime @default(now())
+  users     User[]
+}
+
 model User {
   id           String         @id @default(cuid())
+  // "チームコード-個人ID" の連結文字列(ADMIN はプレフィックスなし)。
+  // 複合ユニークにしないのは、ADMIN の teamId が null になり
+  // Postgres が NULL を互いに異なる値として扱うため重複を防げないから。
   loginId      String         @unique
   passwordHash String
   name         String
-  role         String // "COACH" | "PLAYER"
+  role         String // "ADMIN" | "COACH" | "PLAYER"
+  teamId       String? // ADMIN(運営者)のみ null
+  team         Team?          @relation(fields: [teamId], references: [id])
   createdAt    DateTime       @default(now())
   profile      PlayerProfile?
   records      DailyRecord[]
+
+  @@index([teamId])
 }
 
 model PlayerProfile {

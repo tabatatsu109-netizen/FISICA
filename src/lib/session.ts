@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
+import type { Role } from "./team";
 
 const COOKIE_NAME = "fisica_session";
 const SECRET = process.env.SESSION_SECRET ?? "fisica-dev-secret-change-in-production";
@@ -7,7 +8,7 @@ const MAX_AGE_SEC = 60 * 60 * 24 * 30; // 30 days
 
 export type Session = {
   userId: string;
-  role: "COACH" | "PLAYER";
+  role: Role;
 };
 
 function sign(payload: string): string {
@@ -31,7 +32,7 @@ export function decodeSession(token: string | undefined): Session | null {
   const b = Buffer.from(expected);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
   if (Number(expStr) < Math.floor(Date.now() / 1000)) return null;
-  if (role !== "COACH" && role !== "PLAYER") return null;
+  if (role !== "ADMIN" && role !== "COACH" && role !== "PLAYER") return null;
   return { userId, role };
 }
 

@@ -228,19 +228,40 @@ export type CoachPlayerRow = {
   alerts: string[];
 };
 
-export async function getCoachOverview(): Promise<CoachPlayerRow[]> {
+/**
+ * 監督ダッシュボード用の集計。teamId のチームだけを対象にする。
+ *
+ * 以前は選手1人につき1クエリ投げていたため100人規模で往復が100回になっていた。
+ * チーム全員の直近30日を1クエリで取り、userId でまとめてからJS側で集計する。
+ */
+export async function getCoachOverview(teamId: string): Promise<CoachPlayerRow[]> {
   const players = await prisma.user.findMany({
-    where: { role: "PLAYER" },
+    where: { role: "PLAYER", teamId },
     include: { profile: true },
     orderBy: { name: "asc" },
   });
+  if (players.length === 0) return [];
 
-  const rows: CoachPlayerRow[] = [];
-  for (const player of players) {
-    const records = await getRecentRecords(player.id, 30);
-    const last7 = records.filter((r) => r.date >= lastDates(7)[0]);
-    const last14dates = lastDates(14)[0];
-    const last14 = records.filter((r) => r.date >= last14dates);
+  const since = lastDates(30)[0];
+  const allRecords = await prisma.dailyRecord.findMany({
+    where: { userId: { in: players.map((p) => p.id) }, date: { gte: since } },
+    orderBy: { date: "asc" },
+  });
+
+  const byUser = new Map<string, DailyRecord[]>();
+  for (const r of allRecords) {
+    const list = byUser.get(r.userId);
+    if (list) list.push(r);
+    else byUser.set(r.userId, [r]);
+  }
+
+  const last7Start = lastDates(7)[0];
+  const last14Start = lastDates(14)[0];
+
+  return players.map((player) => {
+    const records = byUser.get(player.id) ?? [];
+    const last7 = records.filter((r) => r.date >= last7Start);
+    const last14 = records.filter((r) => r.date >= last14Start);
 
     const latestReadiness = latest(records, (r) => readinessScore(r));
     const avgSleep7 = avg(last7.map((r) => r.sleepHours).filter((v): v is number => v != null));
@@ -270,7 +291,7 @@ export async function getCoachOverview(): Promise<CoachPlayerRow[]> {
       j1Percentile = compareToJleague(latestHeight, latestWeight, player.profile.position as Position).percentile;
     }
 
-    rows.push({
+    return {
       user: player,
       latestReadiness,
       avgSleep7,
@@ -283,12 +304,11 @@ export async function getCoachOverview(): Promise<CoachPlayerRow[]> {
       heightGrowth30,
       j1Percentile,
       alerts,
-    });
-  }
-  return rows;
+    };
+  });
 }
 
-/* ── 筋トレ ───────────────────────────────────────────── */
+/* ── 筋トレ ───────────────────────────────────────── */
 
 export type Point = { date: string; value: number | null };
 

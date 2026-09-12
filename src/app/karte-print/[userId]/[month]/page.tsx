@@ -21,8 +21,13 @@ export default async function KartePrintPage({ params }: PageProps<"/karte-print
   if (!session) redirect("/login");
   const { userId, month } = await params;
   if (!/^\d{4}-\d{2}$/.test(month)) notFound();
-  // 本人または監督のみ閲覧可
-  if (session.role !== "COACH" && session.userId !== userId) notFound();
+  // 本人、または「その選手と同じチームの」監督のみ閲覧可
+  if (session.userId !== userId) {
+    if (session.role !== "COACH") notFound();
+    const coach = await prisma.user.findUnique({ where: { id: session.userId }, select: { teamId: true } });
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { teamId: true } });
+    if (!coach?.teamId || coach.teamId !== target?.teamId) notFound();
+  }
 
   const [player, summary] = await Promise.all([getPlayer(userId), getMonthSummary(userId, month)]);
   if (!player || player.role !== "PLAYER") notFound();

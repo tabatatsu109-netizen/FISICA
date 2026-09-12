@@ -4,5 +4,5 @@ import { getSession } from "@/lib/session";
 export default async function Home() {
   const session = await getSession();
   if (!session) redirect("/login");
-  redirect(session.role === "COACH" ? "/coach" : "/player");
+  redirect(session.role === "ADMIN" ? "/admin" : session.role === "COACH" ? "/coach" : "/player");
 }

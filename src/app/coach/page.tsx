@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getCoachOverview } from "@/lib/data";
+import { requireCoachTeam } from "@/lib/guard";
 import { scoreBand, BAND_COLORS } from "@/lib/score";
 import { ScoreGuide } from "@/components/ScoreGuide";
 
@@ -16,7 +17,8 @@ function ReadinessBadge({ score }: { score: number | null }) {
 }
 
 export default async function CoachDashboard() {
-  const rows = await getCoachOverview();
+  const { teamId } = await requireCoachTeam();
+  const rows = await getCoachOverview(teamId);
 
   const alertRows = rows.filter((r) => r.alerts.length > 0);
   const avgReadiness =
