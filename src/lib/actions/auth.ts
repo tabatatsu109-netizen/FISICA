@@ -57,7 +57,7 @@ export async function login(_prev: LoginState, formData: FormData): Promise<Logi
 
   await clearLoginFailures(loginId);
   const role = user.role as Role;
-  await setSessionCookie({ userId: user.id, role });
+  await setSessionCookie(user);
   redirect(HOME_BY_ROLE[role] ?? "/player");
 }
 

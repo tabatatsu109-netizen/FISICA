@@ -96,7 +96,11 @@ export async function resetCoachPassword(_prev: AdminActionState, formData: Form
   const password = generatePassword();
   await prisma.user.update({
     where: { id: coach.id },
-    data: { passwordHash: await bcrypt.hash(password, 10) },
+    data: {
+      passwordHash: await bcrypt.hash(password, 10),
+      // 古いパスワードで入られた端末を締め出す。増やすと発行済みCookieが無効になる
+      sessionVersion: { increment: 1 },
+    },
   });
 
   revalidatePath("/admin");
@@ -146,6 +150,6 @@ export async function createFirstAdmin(_prev: SetupState, formData: FormData): P
     },
   });
 
-  await setSessionCookie({ userId: admin.id, role: "ADMIN" });
+  await setSessionCookie(admin);
   redirect("/admin");
 }

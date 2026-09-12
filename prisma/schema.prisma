@@ -17,19 +17,22 @@ model Team {
 }
 
 model User {
-  id           String         @id @default(cuid())
+  id             String         @id @default(cuid())
   // "チームコード-個人ID" の連結文字列(ADMIN はプレフィックスなし)。
   // 複合ユニークにしないのは、ADMIN の teamId が null になり
   // Postgres が NULL を互いに異なる値として扱うため重複を防げないから。
-  loginId      String         @unique
-  passwordHash String
-  name         String
-  role         String // "ADMIN" | "COACH" | "PLAYER"
-  teamId       String? // ADMIN(運営者)のみ null
-  team         Team?          @relation(fields: [teamId], references: [id])
-  createdAt    DateTime       @default(now())
-  profile      PlayerProfile?
-  records      DailyRecord[]
+  loginId        String         @unique
+  passwordHash   String
+  name           String
+  role           String // "ADMIN" | "COACH" | "PLAYER"
+  // 増やすと、そのユーザーの発行済みCookieがすべて無効になる。
+  // パスワード再発行時に増やして、古い端末を締め出す。
+  sessionVersion Int            @default(0)
+  teamId         String? // ADMIN(運営者)のみ null
+  team           Team?          @relation(fields: [teamId], references: [id])
+  createdAt      DateTime       @default(now())
+  profile        PlayerProfile?
+  records        DailyRecord[]
 
   @@index([teamId])
 }

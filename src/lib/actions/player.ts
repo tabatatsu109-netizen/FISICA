@@ -270,11 +270,19 @@ export async function resetPlayerPassword(_prev: PlayerActionState, formData: Fo
   const password = generatePassword();
   await prisma.user.update({
     where: { id: player.id },
-    data: { passwordHash: await bcrypt.hash(password, 10) },
+    data: {
+      passwordHash: await bcrypt.hash(password, 10),
+      // 古いパスワードで入られた端末を締め出す。増やすと発行済みCookieが無効になる
+      sessionVersion: { increment: 1 },
+    },
   });
 
   revalidatePath("/coach");
-  return { message: `${player.name} さんの新しいパスワード: ${password}\n(この画面を離れると二度と表示されません)` };
+  return {
+    message:
+      `${player.name} さんの新しいパスワード: ${password}\n` +
+      `(この画面を離れると二度と表示されません。今までログインしていた端末はログアウトされます)`,
+  };
 }
 
 /** 監督が自チームの選手を削除する。記録も一緒に消える */
