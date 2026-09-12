@@ -57,7 +57,7 @@ export function PlayersForm({ teamCode, roster }: { teamCode: string; roster: Ro
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-2">初期パスワード</span>
-              <input name="password" required className={inputClass} placeholder="4文字以上" />
+              <input name="password" required className={inputClass} placeholder="8文字以上" />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-2">生年月日</span>

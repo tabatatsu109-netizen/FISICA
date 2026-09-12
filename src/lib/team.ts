@@ -44,7 +44,9 @@ export function personalLoginId(loginId: string, teamCode: string | null | undef
 /** CSV一括登録の上限。取り込みが長引いてタイムアウトするのを防ぐ */
 export const BULK_MAX_ROWS = 200;
 
-export const PASSWORD_MIN = 4;
+// 総当たりに耐えるための下限。ログイン試行にレート制限を入れても、
+// 4文字では候補が少なすぎて破られる。
+export const PASSWORD_MIN = 8;
 
 export function isValidPassword(password: string): boolean {
   return password.length >= PASSWORD_MIN;

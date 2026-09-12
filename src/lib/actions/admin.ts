@@ -128,11 +128,11 @@ export async function createFirstAdmin(_prev: SetupState, formData: FormData): P
 
   const name = String(formData.get("name") ?? "").trim();
   const loginId = String(formData.get("loginId") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
+  const password = String(formData.get("password") ?? "").trim();
 
   if (!name) return { error: "氏名を入力してください" };
   if (!isValidPersonalId(loginId)) return { error: "ログインIDは半角英数字・-・_のみ使えます" };
-  if (password.length < 8) return { error: "運営者のパスワードは8文字以上にしてください" };
+  if (!isValidPassword(password)) return { error: `運営者のパスワードは${PASSWORD_MIN}文字以上にしてください` };
 
   const existing = await prisma.user.findUnique({ where: { loginId } });
   if (existing) return { error: `ログインID "${loginId}" は既に使われています` };
