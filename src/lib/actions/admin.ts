@@ -1,6 +1,7 @@
 "use server";
 
 import bcrypt from "bcryptjs";
+import { createHash, timingSafeEqual } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
@@ -18,6 +19,17 @@ import {
 } from "@/lib/team";
 
 export type AdminActionState = { error?: string; message?: string };
+
+/**
+ * セットアップトークンの一致判定。
+ * `===` は先頭から違う文字が出た時点で戻るため、比較にかかる時間から
+ * 何文字目まで合っているかが漏れる。固定長のハッシュにしてから比べる。
+ */
+function tokensMatch(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
 
 /** チームを1つ作る */
 export async function createTeam(_prev: AdminActionState, formData: FormData): Promise<AdminActionState> {
@@ -96,7 +108,11 @@ export async function resetCoachPassword(_prev: AdminActionState, formData: Form
   const password = generatePassword();
   await prisma.user.update({
     where: { id: coach.id },
-    data: { passwordHash: await bcrypt.hash(password, 10) },
+    data: {
+      passwordHash: await bcrypt.hash(password, 10),
+      // 古いパスワードで入られた端末を締め出す。増やすと発行済みCookieが無効になる
+      sessionVersion: { increment: 1 },
+    },
   });
 
   revalidatePath("/admin");
@@ -124,28 +140,36 @@ export async function createFirstAdmin(_prev: SetupState, formData: FormData): P
   if (adminCount > 0) return { error: "既に運営者アカウントが存在します" };
 
   const token = String(formData.get("token") ?? "");
-  if (token !== expectedToken) return { error: "セットアップトークンが違います" };
+  if (!tokensMatch(token, expectedToken)) return { error: "セットアップトークンが違います" };
 
   const name = String(formData.get("name") ?? "").trim();
   const loginId = String(formData.get("loginId") ?? "").trim();
-  const password = String(formData.get("password") ?? "");
+  const password = String(formData.get("password") ?? "").trim();
 
   if (!name) return { error: "氏名を入力してください" };
   if (!isValidPersonalId(loginId)) return { error: "ログインIDは半角英数字・-・_のみ使えます" };
-  if (password.length < 8) return { error: "運営者のパスワードは8文字以上にしてください" };
+  if (!isValidPassword(password)) return { error: `運営者のパスワードは${PASSWORD_MIN}文字以上にしてください` };
 
   const existing = await prisma.user.findUnique({ where: { loginId } });
   if (existing) return { error: `ログインID "${loginId}" は既に使われています` };
 
-  const admin = await prisma.user.create({
-    data: {
-      loginId, // 運営者はチームに属さないのでプレフィックスなし
-      passwordHash: await bcrypt.hash(password, 10),
-      name,
-      role: "ADMIN",
-    },
-  });
+  const passwordHash = await bcrypt.hash(password, 10);
 
-  await setSessionCookie({ userId: admin.id, role: "ADMIN" });
+  // 上の件数チェックと作成の間に別のリクエストが入ると運営者が2人できてしまう。
+  // 同じトランザクションの中で数え直す。
+  const admin = await prisma.$transaction(async (tx) => {
+    if ((await tx.user.count({ where: { role: "ADMIN" } })) > 0) return null;
+    return tx.user.create({
+      data: {
+        loginId, // 運営者はチームに属さないのでプレフィックスなし
+        passwordHash,
+        name,
+        role: "ADMIN",
+      },
+    });
+  });
+  if (!admin) return { error: "既に運営者アカウントが存在します" };
+
+  await setSessionCookie(admin);
   redirect("/admin");
 }

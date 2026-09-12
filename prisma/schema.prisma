@@ -17,21 +17,35 @@ model Team {
 }
 
 model User {
-  id           String         @id @default(cuid())
+  id             String         @id @default(cuid())
   // "チームコード-個人ID" の連結文字列(ADMIN はプレフィックスなし)。
   // 複合ユニークにしないのは、ADMIN の teamId が null になり
   // Postgres が NULL を互いに異なる値として扱うため重複を防げないから。
-  loginId      String         @unique
-  passwordHash String
-  name         String
-  role         String // "ADMIN" | "COACH" | "PLAYER"
-  teamId       String? // ADMIN(運営者)のみ null
-  team         Team?          @relation(fields: [teamId], references: [id])
-  createdAt    DateTime       @default(now())
-  profile      PlayerProfile?
-  records      DailyRecord[]
+  loginId        String         @unique
+  passwordHash   String
+  name           String
+  role           String // "ADMIN" | "COACH" | "PLAYER"
+  // 増やすと、そのユーザーの発行済みCookieがすべて無効になる。
+  // パスワード再発行時に増やして、古い端末を締め出す。
+  sessionVersion Int            @default(0)
+  teamId         String? // ADMIN(運営者)のみ null
+  team           Team?          @relation(fields: [teamId], references: [id])
+  createdAt      DateTime       @default(now())
+  profile        PlayerProfile?
+  records        DailyRecord[]
 
   @@index([teamId])
+}
+
+/// ログインの連続失敗を記録して総当たりを止める。
+/// 存在しないログインIDも記録する。記録の有無で実在するIDが分かってしまうため。
+model LoginAttempt {
+  loginId     String    @id
+  failures    Int       @default(0)
+  windowStart DateTime  @default(now())
+  lockedUntil DateTime?
+
+  @@index([windowStart])
 }
 
 model PlayerProfile {
@@ -47,9 +61,9 @@ model PlayerProfile {
 }
 
 model DailyRecord {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   date         String // "YYYY-MM-DD"
   weightKg     Float?
   heightCm     Float?
@@ -62,8 +76,8 @@ model DailyRecord {
   mealsJson    String? // {"breakfast":{"ate":true,"tags":["主食",...]},...}
   note         String?
   workouts     WorkoutEntry[]
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
 
   @@unique([userId, date])
   @@index([date])

@@ -9,6 +9,7 @@ import {
   deletePlayer,
   type PlayerActionState,
 } from "@/lib/actions/player";
+import { PASSWORD_MIN } from "@/lib/team";
 
 const inputClass =
   "bg-surface-2 border border-white/10 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-accent";
@@ -57,7 +58,14 @@ export function PlayersForm({ teamCode, roster }: { teamCode: string; roster: Ro
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-2">初期パスワード</span>
-              <input name="password" required className={inputClass} placeholder="4文字以上" />
+              <input
+                name="password"
+                type="password"
+                autoComplete="new-password"
+                required
+                className={inputClass}
+                placeholder="8文字以上"
+              />
             </label>
             <label className="flex flex-col gap-1">
               <span className="text-xs text-ink-2">生年月日</span>
@@ -117,9 +125,13 @@ export function PlayersForm({ teamCode, roster }: { teamCode: string; roster: Ro
           氏名,ログインID,初期パスワード,ポジション,学年,背番号,生年月日,性別
         </p>
         <p className="text-xs text-ink-3 mb-4 leading-relaxed">
-          例: <span className="font-mono">田中太郎,tanaka2,pass1234,MF,1,15,2011-04-05,男</span>
+          例: <span className="font-mono">田中太郎,tanaka2,8cezd4c7,MF,1,15,2011-04-05,男</span>
           <br />
           ポジションは GK/DF/MF/FW、性別は 男/女(空欄は男子扱い)、背番号は空欄可です。
+          <br />
+          初期パスワードは{PASSWORD_MIN}文字以上で、
+          <strong className="text-ink-2">全員を同じ値にしないでください</strong>
+          (1人分が漏れると全員に入られます)。
           <br />
           ログインIDにチームコードを付ける必要はありません。自動で付きます。
           <br />
